@@ -359,12 +359,13 @@ struct _stmt {
 enum _expr_kind {BoolOp_kind=1, NamedExpr_kind=2, BinOp_kind=3, UnaryOp_kind=4,
                   Lambda_kind=5, IfExp_kind=6, Dict_kind=7, Set_kind=8,
                   ListComp_kind=9, SetComp_kind=10, DictComp_kind=11,
-                  GeneratorExp_kind=12, Await_kind=13, Yield_kind=14,
-                  YieldFrom_kind=15, Compare_kind=16, Call_kind=17,
-                  FormattedValue_kind=18, Interpolation_kind=19,
-                  JoinedStr_kind=20, TemplateStr_kind=21, Constant_kind=22,
-                  Attribute_kind=23, Subscript_kind=24, Starred_kind=25,
-                  Name_kind=26, List_kind=27, Tuple_kind=28, Slice_kind=29};
+                  GeneratorExp_kind=12, ExistList_kind=13, ForallList_kind=14,
+                  SubExpr_kind=15, Await_kind=16, Yield_kind=17,
+                  YieldFrom_kind=18, Compare_kind=19, Call_kind=20,
+                  FormattedValue_kind=21, Interpolation_kind=22,
+                  JoinedStr_kind=23, TemplateStr_kind=24, Constant_kind=25,
+                  Attribute_kind=26, Subscript_kind=27, Starred_kind=28,
+                  Name_kind=29, List_kind=30, Tuple_kind=31, Slice_kind=32};
 struct _expr {
     enum _expr_kind kind;
     union {
@@ -429,6 +430,20 @@ struct _expr {
             expr_ty elt;
             asdl_comprehension_seq *generators;
         } GeneratorExp;
+
+        struct {
+            asdl_expr_seq *elts;
+            expr_context_ty ctx;
+        } ExistList;
+
+        struct {
+            asdl_expr_seq *elts;
+            expr_context_ty ctx;
+        } ForallList;
+
+        struct {
+            expr_ty value;
+        } SubExpr;
 
         struct {
             expr_ty value;
@@ -817,6 +832,14 @@ expr_ty _PyAST_DictComp(expr_ty key, expr_ty value, asdl_comprehension_seq *
 expr_ty _PyAST_GeneratorExp(expr_ty elt, asdl_comprehension_seq * generators,
                             int lineno, int col_offset, int end_lineno, int
                             end_col_offset, PyArena *arena);
+expr_ty _PyAST_ExistList(asdl_expr_seq * elts, expr_context_ty ctx, int lineno,
+                         int col_offset, int end_lineno, int end_col_offset,
+                         PyArena *arena);
+expr_ty _PyAST_ForallList(asdl_expr_seq * elts, expr_context_ty ctx, int
+                          lineno, int col_offset, int end_lineno, int
+                          end_col_offset, PyArena *arena);
+expr_ty _PyAST_SubExpr(expr_ty value, int lineno, int col_offset, int
+                       end_lineno, int end_col_offset, PyArena *arena);
 expr_ty _PyAST_Await(expr_ty value, int lineno, int col_offset, int end_lineno,
                      int end_col_offset, PyArena *arena);
 expr_ty _PyAST_Yield(expr_ty value, int lineno, int col_offset, int end_lineno,

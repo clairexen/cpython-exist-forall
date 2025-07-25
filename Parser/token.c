@@ -61,6 +61,8 @@ const char * const _PyParser_TokenNames[] = {
     "ELLIPSIS",
     "COLONEQUAL",
     "EXCLAMATION",
+    "LSUBEXPR",
+    "RSUBEXPR",
     "OP",
     "TYPE_IGNORE",
     "TYPE_COMMENT",
@@ -131,6 +133,11 @@ _PyToken_TwoChars(int c1, int c2)
         case '=': return AMPEREQUAL;
         }
         break;
+    case '(':
+        switch (c2) {
+        case ':': return LSUBEXPR;
+        }
+        break;
     case '*':
         switch (c2) {
         case '*': return DOUBLESTAR;
@@ -156,6 +163,7 @@ _PyToken_TwoChars(int c1, int c2)
         break;
     case ':':
         switch (c2) {
+        case ')': return RSUBEXPR;
         case '=': return COLONEQUAL;
         }
         break;
