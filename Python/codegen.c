@@ -5305,6 +5305,11 @@ codegen_visit_expr(compiler *c, expr_ty e)
         return codegen_list(c, e);
     case Tuple_kind:
         return codegen_tuple(c, e);
+    case SubExpr_kind:
+        return codegen_visit_expr(c, e->v.SubExpr.value);
+    case ExistList_kind:
+    case ForallList_kind:
+        assert(!"ExistList or ForallList outside of SubExpr");
     }
     return SUCCESS;
 }

@@ -19,6 +19,10 @@ typedef struct {
     int optimize;
     int ff_features;
     int syntax_check_only;
+    int cnt_exist;
+    int cnt_forall;
+    asdl_expr_seq *exist_elts;
+    asdl_expr_seq *forall_elts;
 
     _Py_c_array_t cf_finally;       /* context for PEP 765 check */
     int cf_finally_used;
@@ -488,6 +492,137 @@ astfold_mod(mod_ty node_, PyArena *ctx_, _PyASTPreprocessState *state)
 }
 
 static int
+ast_rewrite_exist_forall_expr(expr_ty node_, PyArena *ctx_, _PyASTPreprocessState *state)
+{
+    assert(node_->kind == SubExpr_kind);
+    expr_ty orig_value = node_->v.SubExpr.value;
+
+    // Build: lambda: <original value>
+    // Create empty args: `()`
+    asdl_arg_seq *lambda_arglist = _Py_asdl_arg_seq_new(2, ctx_);
+    if (!lambda_arglist) return 0;
+
+    identifier ea_exist_var = PyUnicode_InternFromString("_ea_exist_items_");
+    identifier ea_forall_var = PyUnicode_InternFromString("_ea_forall_items_");
+
+    arg_ty lambda_arg_exist_items = _PyAST_arg(
+        ea_exist_var,
+        NULL, NULL,   // annotation, comment
+        orig_value->lineno,
+        orig_value->col_offset,
+        orig_value->end_lineno,
+        orig_value->end_col_offset,
+        ctx_
+    );
+
+    arg_ty lambda_arg_forall_items = _PyAST_arg(
+        ea_forall_var,
+        NULL, NULL,   // annotation, comment
+        orig_value->lineno,
+        orig_value->col_offset,
+        orig_value->end_lineno,
+        orig_value->end_col_offset,
+        ctx_
+    );
+
+    asdl_seq_SET(lambda_arglist, 0, lambda_arg_exist_items);
+    asdl_seq_SET(lambda_arglist, 1, lambda_arg_forall_items);
+
+    arguments_ty lambda_args = _PyAST_arguments(
+        lambda_arglist,                // posonlyargs
+        NULL,                          // args
+        NULL, NULL, NULL, NULL,        // vararg, kwonlyargs, kw_defaults, kwarg
+        NULL,                          // defaults
+        ctx_
+    );
+    if (!lambda_args) return 0;
+
+    expr_ty lambda = _PyAST_Lambda(
+        lambda_args,
+        orig_value,
+        orig_value->lineno,
+        orig_value->col_offset,
+        orig_value->end_lineno,
+        orig_value->end_col_offset,
+        ctx_
+    );
+    if (!lambda) return 0;
+
+    state->exist_elts = _Py_asdl_expr_seq_new(state->cnt_exist, ctx_);
+    if (!state->exist_elts) return 0;
+
+    state->forall_elts = _Py_asdl_expr_seq_new(state->cnt_forall, ctx_);
+    if (!state->forall_elts) return 0;
+
+    state->cnt_exist = 0;
+    state->cnt_forall = 0;
+    CALL(astfold_expr, expr_ty, orig_value);
+    state->exist_elts->size = state->cnt_exist;
+    state->forall_elts->size = state->cnt_forall;
+
+    expr_ty exist_list = _PyAST_List(
+        state->exist_elts,
+        Load,
+        orig_value->lineno,
+        orig_value->col_offset,
+        orig_value->end_lineno,
+        orig_value->end_col_offset,
+        ctx_
+    );
+    if (!exist_list) return 0;
+
+    expr_ty forall_list = _PyAST_List(
+        state->forall_elts,
+        Load,
+        orig_value->lineno,
+        orig_value->col_offset,
+        orig_value->end_lineno,
+        orig_value->end_col_offset,
+        ctx_
+    );
+    if (!forall_list) return 0;
+
+    state->exist_elts = NULL;
+    state->forall_elts = NULL;
+
+    expr_ty callee = _PyAST_Name(
+        PyUnicode_InternFromString("__exist_forall_eval__"),
+        Load,
+        orig_value->lineno,
+        orig_value->col_offset,
+        orig_value->end_lineno,
+        orig_value->end_col_offset,
+        ctx_
+    );
+    if (!callee) return 0;
+
+    asdl_expr_seq *args_seq = _Py_asdl_expr_seq_new(3, ctx_);
+    if (!args_seq) return 0;
+
+    asdl_seq_SET(args_seq, 0, lambda);
+    asdl_seq_SET(args_seq, 1, exist_list);
+    asdl_seq_SET(args_seq, 2, forall_list);
+
+    asdl_keyword_seq *keywords = _Py_asdl_keyword_seq_new(0, ctx_);
+    if (!keywords) return 0;
+
+    expr_ty call = _PyAST_Call(
+        callee,
+        args_seq,
+        keywords,
+        orig_value->lineno,
+        orig_value->col_offset,
+        orig_value->end_lineno,
+        orig_value->end_col_offset,
+        ctx_
+    );
+    if (!call) return 0;
+
+    node_->v.SubExpr.value = call;
+    return 1;
+}
+
+static int
 astfold_expr(expr_ty node_, PyArena *ctx_, _PyASTPreprocessState *state)
 {
     ENTER_RECURSIVE();
@@ -588,6 +723,96 @@ astfold_expr(expr_ty node_, PyArena *ctx_, _PyASTPreprocessState *state)
         break;
     case Tuple_kind:
         CALL_SEQ(astfold_expr, expr, node_->v.Tuple.elts);
+        break;
+    case ExistList_kind:
+        if (state->exist_elts) {
+            identifier id = PyUnicode_InternFromString("_ea_exist_items_");
+            expr_ty name = _PyAST_Name(
+                id, Load,
+                node_->lineno,
+                node_->col_offset,
+                node_->end_lineno,
+                node_->end_col_offset,
+                ctx_
+            );
+            expr_ty index = _PyAST_Constant(
+                PyLong_FromLong(state->cnt_exist),
+                NULL,
+                node_->lineno,
+                node_->col_offset,
+                node_->end_lineno,
+                node_->end_col_offset,
+                ctx_
+            );
+            expr_ty vals = _PyAST_List(
+                node_->v.ExistList.elts,
+                Load,
+                node_->lineno,
+                node_->col_offset,
+                node_->end_lineno,
+                node_->end_col_offset,
+                ctx_
+            );
+            asdl_seq_SET(state->exist_elts, state->cnt_exist++, vals);
+            node_->kind = Subscript_kind;
+            node_->v.Subscript.value = name;
+            node_->v.Subscript.slice = index;
+            node_->v.Subscript.ctx = Load;
+        } else {
+            state->cnt_exist++;
+            CALL_SEQ(astfold_expr, expr, node_->v.ExistList.elts);
+        }
+        break;
+    case ForallList_kind:
+        if (state->forall_elts) {
+            identifier id = PyUnicode_InternFromString("_ea_forall_items_");
+            expr_ty name = _PyAST_Name(
+                id, Load,
+                node_->lineno,
+                node_->col_offset,
+                node_->end_lineno,
+                node_->end_col_offset,
+                ctx_
+            );
+            expr_ty index = _PyAST_Constant(
+                PyLong_FromLong(state->cnt_forall),
+                NULL,
+                node_->lineno,
+                node_->col_offset,
+                node_->end_lineno,
+                node_->end_col_offset,
+                ctx_
+            );
+            expr_ty vals = _PyAST_List(
+                node_->v.ExistList.elts,
+                Load,
+                node_->lineno,
+                node_->col_offset,
+                node_->end_lineno,
+                node_->end_col_offset,
+                ctx_
+            );
+            asdl_seq_SET(state->forall_elts, state->cnt_forall++, vals);
+            node_->kind = Subscript_kind;
+            node_->v.Subscript.value = name;
+            node_->v.Subscript.slice = index;
+            node_->v.Subscript.ctx = Load;
+        } else {
+            state->cnt_forall++;
+            CALL_SEQ(astfold_expr, expr, node_->v.ForallList.elts);
+        }
+        break;
+    case SubExpr_kind: {
+            int backup_cnt_exist = state->cnt_exist;
+            int backup_cnt_forall = state->cnt_forall;
+            state->cnt_exist = 0;
+            state->cnt_forall = 0;
+            CALL(astfold_expr, expr_ty, node_->v.SubExpr.value);
+            if (state->cnt_exist || state->cnt_forall)
+                    ast_rewrite_exist_forall_expr(node_, ctx_, state);
+            state->cnt_exist = backup_cnt_exist;
+            state->cnt_forall = backup_cnt_forall;
+        }
         break;
     case Name_kind:
         if (state->syntax_check_only) {

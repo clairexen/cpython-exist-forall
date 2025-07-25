@@ -380,13 +380,13 @@ append_ast_list(PyUnicodeWriter *writer, expr_ty e)
 }
 
 static int
-append_ast_tuple(PyUnicodeWriter *writer, expr_ty e, int level)
+append_ast_tuple(PyUnicodeWriter *writer, expr_ty e, int level, const char *existforall_op)
 {
     Py_ssize_t i, elem_count;
 
     elem_count = asdl_seq_LEN(e->v.Tuple.elts);
 
-    if (elem_count == 0) {
+    if (elem_count == 0 && existforall_op) {
         APPEND_STR_FINISH("()");
     }
 
@@ -397,7 +397,8 @@ append_ast_tuple(PyUnicodeWriter *writer, expr_ty e, int level)
         APPEND_EXPR((expr_ty)asdl_seq_GET(e->v.Tuple.elts, i), PR_TEST);
     }
 
-    APPEND_STR_IF(elem_count == 1, ",");
+    APPEND_STR_IF(existforall_op || elem_count <= 1, ",");
+    APPEND_STR_IF(existforall_op, existforall_op);
     APPEND_STR_IF(level > PR_TUPLE, ")");
     return 0;
 }
@@ -997,7 +998,11 @@ append_ast_expr(PyUnicodeWriter *writer, expr_ty e, int level)
     case List_kind:
         return append_ast_list(writer, e);
     case Tuple_kind:
-        return append_ast_tuple(writer, e, level);
+        return append_ast_tuple(writer, e, level, 0);
+    case ForallList_kind:
+        return append_ast_tuple(writer, e, level, "and");
+    case ExistList_kind:
+        return append_ast_tuple(writer, e, level, "or");
     case NamedExpr_kind:
         return append_named_expr(writer, e, level);
     // No default so compiler emits a warning for unhandled cases

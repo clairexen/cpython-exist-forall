@@ -59,6 +59,8 @@ RARROW                  '->'
 ELLIPSIS                '...'
 COLONEQUAL              ':='
 EXCLAMATION             '!'
+LSUBEXPR                '(:'
+RSUBEXPR                ':)'
 
 OP
 TYPE_IGNORE

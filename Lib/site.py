@@ -471,6 +471,10 @@ def sethelper():
     builtins.help = _sitebuiltins._Helper()
 
 
+def seteaeval():
+    builtins.__exist_forall_eval__ = _sitebuiltins.__exist_forall_eval__
+
+
 def gethistoryfile():
     """Check if the PYTHON_HISTORY environment variable is set and define
     it as the .python_history file.  If PYTHON_HISTORY is not set, use the
@@ -710,6 +714,7 @@ def main():
     setquit()
     setcopyright()
     sethelper()
+    seteaeval()
     if not sys.flags.isolated:
         enablerlcompleter()
     execsitecustomize()
