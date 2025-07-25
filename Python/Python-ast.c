@@ -71,11 +71,13 @@ void _PyAST_Fini(PyInterpreterState *interp)
     Py_CLEAR(state->Eq_singleton);
     Py_CLEAR(state->Eq_type);
     Py_CLEAR(state->ExceptHandler_type);
+    Py_CLEAR(state->ExistList_type);
     Py_CLEAR(state->Expr_type);
     Py_CLEAR(state->Expression_type);
     Py_CLEAR(state->FloorDiv_singleton);
     Py_CLEAR(state->FloorDiv_type);
     Py_CLEAR(state->For_type);
+    Py_CLEAR(state->ForallList_type);
     Py_CLEAR(state->FormattedValue_type);
     Py_CLEAR(state->FunctionDef_type);
     Py_CLEAR(state->FunctionType_type);
@@ -152,6 +154,7 @@ void _PyAST_Fini(PyInterpreterState *interp)
     Py_CLEAR(state->Starred_type);
     Py_CLEAR(state->Store_singleton);
     Py_CLEAR(state->Store_type);
+    Py_CLEAR(state->SubExpr_type);
     Py_CLEAR(state->Sub_singleton);
     Py_CLEAR(state->Sub_type);
     Py_CLEAR(state->Subscript_type);
@@ -598,6 +601,17 @@ static const char * const DictComp_fields[]={
 static const char * const GeneratorExp_fields[]={
     "elt",
     "generators",
+};
+static const char * const ExistList_fields[]={
+    "elts",
+    "ctx",
+};
+static const char * const ForallList_fields[]={
+    "elts",
+    "ctx",
+};
+static const char * const SubExpr_fields[]={
+    "value",
 };
 static const char * const Await_fields[]={
     "value",
@@ -2942,6 +2956,111 @@ add_ast_annotations(struct ast_state *state)
         return 0;
     }
     Py_DECREF(GeneratorExp_annotations);
+    PyObject *ExistList_annotations = PyDict_New();
+    if (!ExistList_annotations) return 0;
+    {
+        PyObject *type = state->expr_type;
+        type = Py_GenericAlias((PyObject *)&PyList_Type, type);
+        cond = type != NULL;
+        if (!cond) {
+            Py_DECREF(ExistList_annotations);
+            return 0;
+        }
+        cond = PyDict_SetItemString(ExistList_annotations, "elts", type) == 0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(ExistList_annotations);
+            return 0;
+        }
+    }
+    {
+        PyObject *type = state->expr_context_type;
+        Py_INCREF(type);
+        cond = PyDict_SetItemString(ExistList_annotations, "ctx", type) == 0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(ExistList_annotations);
+            return 0;
+        }
+    }
+    cond = PyObject_SetAttrString(state->ExistList_type, "_field_types",
+                                  ExistList_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(ExistList_annotations);
+        return 0;
+    }
+    cond = PyObject_SetAttrString(state->ExistList_type, "__annotations__",
+                                  ExistList_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(ExistList_annotations);
+        return 0;
+    }
+    Py_DECREF(ExistList_annotations);
+    PyObject *ForallList_annotations = PyDict_New();
+    if (!ForallList_annotations) return 0;
+    {
+        PyObject *type = state->expr_type;
+        type = Py_GenericAlias((PyObject *)&PyList_Type, type);
+        cond = type != NULL;
+        if (!cond) {
+            Py_DECREF(ForallList_annotations);
+            return 0;
+        }
+        cond = PyDict_SetItemString(ForallList_annotations, "elts", type) == 0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(ForallList_annotations);
+            return 0;
+        }
+    }
+    {
+        PyObject *type = state->expr_context_type;
+        Py_INCREF(type);
+        cond = PyDict_SetItemString(ForallList_annotations, "ctx", type) == 0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(ForallList_annotations);
+            return 0;
+        }
+    }
+    cond = PyObject_SetAttrString(state->ForallList_type, "_field_types",
+                                  ForallList_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(ForallList_annotations);
+        return 0;
+    }
+    cond = PyObject_SetAttrString(state->ForallList_type, "__annotations__",
+                                  ForallList_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(ForallList_annotations);
+        return 0;
+    }
+    Py_DECREF(ForallList_annotations);
+    PyObject *SubExpr_annotations = PyDict_New();
+    if (!SubExpr_annotations) return 0;
+    {
+        PyObject *type = state->expr_type;
+        Py_INCREF(type);
+        cond = PyDict_SetItemString(SubExpr_annotations, "value", type) == 0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(SubExpr_annotations);
+            return 0;
+        }
+    }
+    cond = PyObject_SetAttrString(state->SubExpr_type, "_field_types",
+                                  SubExpr_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(SubExpr_annotations);
+        return 0;
+    }
+    cond = PyObject_SetAttrString(state->SubExpr_type, "__annotations__",
+                                  SubExpr_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(SubExpr_annotations);
+        return 0;
+    }
+    Py_DECREF(SubExpr_annotations);
     PyObject *Await_annotations = PyDict_New();
     if (!Await_annotations) return 0;
     {
@@ -6394,6 +6513,9 @@ init_types(void *arg)
         "     | SetComp(expr elt, comprehension* generators)\n"
         "     | DictComp(expr key, expr value, comprehension* generators)\n"
         "     | GeneratorExp(expr elt, comprehension* generators)\n"
+        "     | ExistList(expr* elts, expr_context ctx)\n"
+        "     | ForallList(expr* elts, expr_context ctx)\n"
+        "     | SubExpr(expr value)\n"
         "     | Await(expr value)\n"
         "     | Yield(expr? value)\n"
         "     | YieldFrom(expr value)\n"
@@ -6467,6 +6589,18 @@ init_types(void *arg)
                                          2,
         "GeneratorExp(expr elt, comprehension* generators)");
     if (!state->GeneratorExp_type) return -1;
+    state->ExistList_type = make_type(state, "ExistList", state->expr_type,
+                                      ExistList_fields, 2,
+        "ExistList(expr* elts, expr_context ctx)");
+    if (!state->ExistList_type) return -1;
+    state->ForallList_type = make_type(state, "ForallList", state->expr_type,
+                                       ForallList_fields, 2,
+        "ForallList(expr* elts, expr_context ctx)");
+    if (!state->ForallList_type) return -1;
+    state->SubExpr_type = make_type(state, "SubExpr", state->expr_type,
+                                    SubExpr_fields, 1,
+        "SubExpr(expr value)");
+    if (!state->SubExpr_type) return -1;
     state->Await_type = make_type(state, "Await", state->expr_type,
                                   Await_fields, 1,
         "Await(expr value)");
@@ -8043,6 +8177,75 @@ _PyAST_GeneratorExp(expr_ty elt, asdl_comprehension_seq * generators, int
     p->kind = GeneratorExp_kind;
     p->v.GeneratorExp.elt = elt;
     p->v.GeneratorExp.generators = generators;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+expr_ty
+_PyAST_ExistList(asdl_expr_seq * elts, expr_context_ty ctx, int lineno, int
+                 col_offset, int end_lineno, int end_col_offset, PyArena *arena)
+{
+    expr_ty p;
+    if (!ctx) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'ctx' is required for ExistList");
+        return NULL;
+    }
+    p = (expr_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = ExistList_kind;
+    p->v.ExistList.elts = elts;
+    p->v.ExistList.ctx = ctx;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+expr_ty
+_PyAST_ForallList(asdl_expr_seq * elts, expr_context_ty ctx, int lineno, int
+                  col_offset, int end_lineno, int end_col_offset, PyArena
+                  *arena)
+{
+    expr_ty p;
+    if (!ctx) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'ctx' is required for ForallList");
+        return NULL;
+    }
+    p = (expr_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = ForallList_kind;
+    p->v.ForallList.elts = elts;
+    p->v.ForallList.ctx = ctx;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+expr_ty
+_PyAST_SubExpr(expr_ty value, int lineno, int col_offset, int end_lineno, int
+               end_col_offset, PyArena *arena)
+{
+    expr_ty p;
+    if (!value) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'value' is required for SubExpr");
+        return NULL;
+    }
+    p = (expr_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = SubExpr_kind;
+    p->v.SubExpr.value = value;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -9769,6 +9972,48 @@ ast2obj_expr(struct ast_state *state, void* _o)
                              ast2obj_comprehension);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->generators, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case ExistList_kind:
+        tp = (PyTypeObject *)state->ExistList_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_list(state, (asdl_seq*)o->v.ExistList.elts,
+                             ast2obj_expr);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->elts, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_expr_context(state, o->v.ExistList.ctx);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->ctx, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case ForallList_kind:
+        tp = (PyTypeObject *)state->ForallList_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_list(state, (asdl_seq*)o->v.ForallList.elts,
+                             ast2obj_expr);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->elts, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        value = ast2obj_expr_context(state, o->v.ForallList.ctx);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->ctx, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case SubExpr_kind:
+        tp = (PyTypeObject *)state->SubExpr_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_expr(state, o->v.SubExpr.value);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->value, value) == -1)
             goto failed;
         Py_DECREF(value);
         break;
@@ -14652,6 +14897,174 @@ obj2ast_expr(struct ast_state *state, PyObject* obj, expr_ty* out, PyArena*
         if (*out == NULL) goto failed;
         return 0;
     }
+    tp = state->ExistList_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return -1;
+    }
+    if (isinstance) {
+        asdl_expr_seq* elts;
+        expr_context_ty ctx;
+
+        if (PyObject_GetOptionalAttr(obj, state->elts, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            tmp = PyList_New(0);
+            if (tmp == NULL) {
+                return -1;
+            }
+        }
+        {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "ExistList field \"elts\" must be a list, not a %.200s", _PyType_Name(Py_TYPE(tmp)));
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            elts = _Py_asdl_expr_seq_new(len, arena);
+            if (elts == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                expr_ty val;
+                PyObject *tmp2 = Py_NewRef(PyList_GET_ITEM(tmp, i));
+                if (_Py_EnterRecursiveCall(" while traversing 'ExistList' node")) {
+                    goto failed;
+                }
+                res = obj2ast_expr(state, tmp2, &val, arena);
+                _Py_LeaveRecursiveCall();
+                Py_DECREF(tmp2);
+                if (res != 0) goto failed;
+                if (len != PyList_GET_SIZE(tmp)) {
+                    PyErr_SetString(PyExc_RuntimeError, "ExistList field \"elts\" changed size during iteration");
+                    goto failed;
+                }
+                asdl_seq_SET(elts, i, val);
+            }
+            Py_CLEAR(tmp);
+        }
+        if (PyObject_GetOptionalAttr(obj, state->ctx, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"ctx\" missing from ExistList");
+            return -1;
+        }
+        else {
+            int res;
+            if (_Py_EnterRecursiveCall(" while traversing 'ExistList' node")) {
+                goto failed;
+            }
+            res = obj2ast_expr_context(state, tmp, &ctx, arena);
+            _Py_LeaveRecursiveCall();
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        *out = _PyAST_ExistList(elts, ctx, lineno, col_offset, end_lineno,
+                                end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    tp = state->ForallList_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return -1;
+    }
+    if (isinstance) {
+        asdl_expr_seq* elts;
+        expr_context_ty ctx;
+
+        if (PyObject_GetOptionalAttr(obj, state->elts, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            tmp = PyList_New(0);
+            if (tmp == NULL) {
+                return -1;
+            }
+        }
+        {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "ForallList field \"elts\" must be a list, not a %.200s", _PyType_Name(Py_TYPE(tmp)));
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            elts = _Py_asdl_expr_seq_new(len, arena);
+            if (elts == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                expr_ty val;
+                PyObject *tmp2 = Py_NewRef(PyList_GET_ITEM(tmp, i));
+                if (_Py_EnterRecursiveCall(" while traversing 'ForallList' node")) {
+                    goto failed;
+                }
+                res = obj2ast_expr(state, tmp2, &val, arena);
+                _Py_LeaveRecursiveCall();
+                Py_DECREF(tmp2);
+                if (res != 0) goto failed;
+                if (len != PyList_GET_SIZE(tmp)) {
+                    PyErr_SetString(PyExc_RuntimeError, "ForallList field \"elts\" changed size during iteration");
+                    goto failed;
+                }
+                asdl_seq_SET(elts, i, val);
+            }
+            Py_CLEAR(tmp);
+        }
+        if (PyObject_GetOptionalAttr(obj, state->ctx, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"ctx\" missing from ForallList");
+            return -1;
+        }
+        else {
+            int res;
+            if (_Py_EnterRecursiveCall(" while traversing 'ForallList' node")) {
+                goto failed;
+            }
+            res = obj2ast_expr_context(state, tmp, &ctx, arena);
+            _Py_LeaveRecursiveCall();
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        *out = _PyAST_ForallList(elts, ctx, lineno, col_offset, end_lineno,
+                                 end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    tp = state->SubExpr_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return -1;
+    }
+    if (isinstance) {
+        expr_ty value;
+
+        if (PyObject_GetOptionalAttr(obj, state->value, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"value\" missing from SubExpr");
+            return -1;
+        }
+        else {
+            int res;
+            if (_Py_EnterRecursiveCall(" while traversing 'SubExpr' node")) {
+                goto failed;
+            }
+            res = obj2ast_expr(state, tmp, &value, arena);
+            _Py_LeaveRecursiveCall();
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        *out = _PyAST_SubExpr(value, lineno, col_offset, end_lineno,
+                              end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
     tp = state->Await_type;
     isinstance = PyObject_IsInstance(obj, tp);
     if (isinstance == -1) {
@@ -18141,6 +18554,15 @@ astmodule_exec(PyObject *m)
     }
     if (PyModule_AddObjectRef(m, "GeneratorExp", state->GeneratorExp_type) < 0)
         {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "ExistList", state->ExistList_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "ForallList", state->ForallList_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "SubExpr", state->SubExpr_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "Await", state->Await_type) < 0) {

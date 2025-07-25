@@ -54,11 +54,13 @@ struct ast_state {
     PyObject *Eq_singleton;
     PyObject *Eq_type;
     PyObject *ExceptHandler_type;
+    PyObject *ExistList_type;
     PyObject *Expr_type;
     PyObject *Expression_type;
     PyObject *FloorDiv_singleton;
     PyObject *FloorDiv_type;
     PyObject *For_type;
+    PyObject *ForallList_type;
     PyObject *FormattedValue_type;
     PyObject *FunctionDef_type;
     PyObject *FunctionType_type;
@@ -135,6 +137,7 @@ struct ast_state {
     PyObject *Starred_type;
     PyObject *Store_singleton;
     PyObject *Store_type;
+    PyObject *SubExpr_type;
     PyObject *Sub_singleton;
     PyObject *Sub_type;
     PyObject *Subscript_type;
