@@ -271,6 +271,9 @@ validate_expr(expr_ty exp, expr_context_ty ctx)
     case UnaryOp_kind:
         ret = validate_expr(exp->v.UnaryOp.operand, Load);
         break;
+    case SubExpr_kind:
+        ret = validate_expr(exp->v.SubExpr.value, Load);
+        break;
     case Lambda_kind:
         ret = validate_arguments(exp->v.Lambda.args) &&
             validate_expr(exp->v.Lambda.body, Load);

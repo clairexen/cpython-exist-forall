@@ -101,3 +101,26 @@ class _Helper(object):
     def __call__(self, *args, **kwds):
         import pydoc
         return pydoc.help(*args, **kwds)
+
+def __exist_forall_eval__(fn, exist, forall):
+    """The default '__exist_forall_eval__' builtin.
+
+    This is called whenever an Exist-Forall expression is being evaluated.
+
+    If 'exist' is empty, this function returns True or False.
+
+    If 'exist' is non-empty, either None or the found set of values is returned.
+    """
+    from itertools import product
+    exist_prod = list(product(*exist))
+    forall_prod = list(product(*forall))
+    for exist_items in exist_prod:
+        for forall_idx, forall_items in enumerate(forall_prod):
+            if not fn(exist_items, forall_items):
+                # re-order forall_prod so that items that fail often are tried first
+                if forall_idx:
+                    forall_prod = [forall_items, *forall_prod[:forall_idx], *forall_prod[forall_idx:]]
+                break
+        else:
+            return exist_items if exist_items else True
+    return None if exist_items else False

@@ -2408,6 +2408,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
     case UnaryOp_kind:
         VISIT(st, expr, e->v.UnaryOp.operand);
         break;
+    case SubExpr_kind:
+        VISIT(st, expr, e->v.SubExpr.value);
+        break;
     case Lambda_kind: {
         if (e->v.Lambda.args->defaults)
             VISIT_SEQ(st, expr, e->v.Lambda.args->defaults);

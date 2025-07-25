@@ -725,6 +725,8 @@ star_expression[expr_ty] (memo):
     | expression
 
 star_named_expressions[asdl_expr_seq*]: a[asdl_expr_seq*]=','.star_named_expression+ [','] { a }
+star_named_or_expressions[asdl_expr_seq*]: a[asdl_expr_seq*]=(',' 'or'?).star_named_expression+ [',' 'or'?] { a }
+star_named_and_expressions[asdl_expr_seq*]: a[asdl_expr_seq*]=(',' 'and'?).star_named_expression+ [',' 'and'?] { a }
 
 star_named_expression[expr_ty]:
     | '*' a=bitwise_or { _PyAST_Starred(a, Load, EXTRA) }
@@ -877,10 +879,14 @@ atom[expr_ty]:
     | 'None' { _PyAST_Constant(Py_None, NULL, EXTRA) }
     | &(STRING|FSTRING_START|TSTRING_START) strings
     | NUMBER
-    | &'(' (tuple | group | genexp)
+    | &'(' (tuple | exist_list | forall_list | group | genexp)
     | &'[' (list | listcomp)
     | &'{' (dict | set | dictcomp | setcomp)
+    | subexpr
     | '...' { _PyAST_Constant(Py_Ellipsis, NULL, EXTRA) }
+
+subexpr[expr_ty]:
+    | '(' NAME? ':' a=(yield_expr | named_expression) ':' ')' { _PyAST_SubExpr(a, EXTRA) }
 
 group[expr_ty]:
     | '(' a=(yield_expr | named_expression) ')' { a }
@@ -998,6 +1004,14 @@ list[expr_ty]:
 tuple[expr_ty]:
     | '(' a=[y=star_named_expression ',' z=[star_named_expressions] { _PyPegen_seq_insert_in_front(p, y, z) } ] ')' {
         _PyAST_Tuple(a, Load, EXTRA) }
+
+exist_list[expr_ty]:
+    | '(' a=[y=star_named_expression ',' 'or'? z=[star_named_or_expressions] { _PyPegen_seq_insert_in_front(p, y, z) } ] ')' {
+        _PyAST_ExistList(a, Load, EXTRA) }
+
+forall_list[expr_ty]:
+    | '(' a=[y=star_named_expression ',' 'and'? z=[star_named_and_expressions] { _PyPegen_seq_insert_in_front(p, y, z) } ] ')' {
+        _PyAST_ForallList(a, Load, EXTRA) }
 
 set[expr_ty]: '{' a=star_named_expressions '}' { _PyAST_Set(a, EXTRA) }
 
